@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.ToolBar?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane prefHeight="800" prefWidth="1200" style="-fx-background-color: #a1b8c4;" xmlns="http://javafx.com/javafx/24.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="juego.app.EightOffController">
+
+    <top>
+        <VBox>
+            <ToolBar>
+                <Button onAction="#onNuevoJuego" style="-fx-background-radius: 10;" text="Nuevo Juego" />
+                <Button fx:id="btnDeshacer" onAction="#onDeshacer" style="-fx-background-radius: 10;" text="Deshacer" />
+                <Button fx:id="btnPista" onAction="#onPista" style="-fx-background-radius: 10;" text="Pista" />
+                <Region HBox.hgrow="ALWAYS" />
+                <Label fx:id="labelMovimientos" style="-fx-padding: 5 10 5 10; -fx-background-radius: 5;" text="Movimientos: 0">
+                    <font><Font size="13.0" /></font>
+                </Label>
+            </ToolBar>
+        </VBox>
+    </top>
+
+    <center>
+        <VBox spacing="20" style="-fx-background-color: transparent;">
+            <padding>
+                <Insets bottom="10" left="20" right="20" top="20" />
+            </padding>
+
+            <!-- ========== ZONA SUPERIOR: Fundaciones a la izquierda, Celdas Libres a la derecha ========== -->
+            <HBox alignment="CENTER" spacing="30" style="-fx-background-color: transparent; -fx-background-radius: 10; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 5, 0, 0, 2);">
+                <padding>
+                    <Insets bottom="10" left="10" right="10" top="10" />
+                </padding>
+
+                <!-- Celdas Libres (8 celdas en 1 fila) -->
+                <VBox alignment="CENTER" prefHeight="50.0" prefWidth="998.0" spacing="8">
+                    <!-- CAMBIAR: de GridPane a HBox -->
+                    <HBox fx:id="hboxCeldasLibres" alignment="CENTER" spacing="8" style="-fx-background-color: transparent; -fx-background-radius: 8; -fx-padding: 10;" />
+                </VBox>
+            </HBox>
+
+            <!-- ========== ZONA CENTRAL: Tableau (8 columnas) ========== -->
+            <VBox spacing="8" VBox.vgrow="ALWAYS">
+
+                <ScrollPane fitToHeight="false" fitToWidth="true" hbarPolicy="AS_NEEDED" style="-fx-background-color: transparent; -fx-background: transparent;" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS">
+                    <HBox fx:id="hboxTableau" alignment="TOP_CENTER" minHeight="400" minWidth="1000" spacing="10" style="-fx-background-color: transparent; -fx-background-radius: 8;">
+                        <padding>
+                            <Insets bottom="10" left="10" right="10" top="10" />
+                        </padding>
+                    </HBox>
+                </ScrollPane>
+            </VBox>
+        </VBox>
+    </center>
+
+    <bottom>
+        <VBox style="-fx-background-color: orange;">
+            <HBox alignment="CENTER_LEFT" prefHeight="5.0" prefWidth="1200.0" spacing="15">
+                <padding>
+                    <Insets bottom="8" left="15" right="15" top="8" />
+                </padding>
+            </HBox>
+        </VBox>
+    </bottom>
+    <left>
+        <VBox prefHeight="200.0" prefWidth="100.0" BorderPane.alignment="CENTER">
+            <children>
+                <!-- Fundaciones (4 pilas en 1 columna vertical) -->
+                <VBox alignment="CENTER" spacing="8">
+                    <!-- CAMBIAR: de GridPane a VBox -->
+                    <VBox fx:id="vboxFundaciones" alignment="CENTER" prefHeight="692.0" prefWidth="100.0" spacing="8" style="-fx-background-color: transparent; -fx-background-radius: 8; -fx-padding: 10;" />
+                </VBox>
+            </children>
+        </VBox>
+    </left>
+</BorderPane>
