@@ -1,9 +1,10 @@
 package juego.logica;
 
+import java.util.Random;
+
 public class Baraja {
 
     private ListaDobleCircular<Carta> cartas;
-
 
     public Baraja() {
         cartas = new ListaDobleCircular<>();
@@ -20,12 +21,32 @@ public class Baraja {
     }
 
     public void barajar() {
-        cartas.barajar();
-    }
+        if (cartas.estaVacia() || cartas.getTamaño() == 1) {
+            return;
+        }
 
+        // Crear un array temporal con las cartas
+        Carta[] cartasArray = new Carta[cartas.getTamaño()];
 
-    public void barajar(long seed) {
-        cartas.barajar(seed);
+        // Extraer todas las cartas de la lista
+        for (int i = 0; i < cartasArray.length; i++) {
+            cartasArray[i] = cartas.eliminarEnIndice(0);
+        }
+
+        // Barajar usando el algoritmo Fisher-Yates
+        Random random = new Random();
+        for (int i = cartasArray.length - 1; i > 0; i--) {
+            int j = random.nextInt(i + 1);
+            // Intercambiar cartas[i] con cartas[j]
+            Carta temp = cartasArray[i];
+            cartasArray[i] = cartasArray[j];
+            cartasArray[j] = temp;
+        }
+
+        // Volver a agregar las cartas barajadas a la lista
+        for (Carta carta : cartasArray) {
+            cartas.agregar(carta);
+        }
     }
 
     public Carta repartir() {
@@ -35,11 +56,9 @@ public class Baraja {
         return cartas.eliminarEnIndice(0);
     }
 
-
     public boolean estaVacia() {
         return cartas.estaVacia();
     }
-
 
     public int cartasRestantes() {
         return cartas.getTamaño();
@@ -48,10 +67,6 @@ public class Baraja {
     public void reiniciar() {
         cartas.limpiar();
         crearBarajaCompleta();
-    }
-
-    public Carta[] verCartas() {
-        return cartas.toArray();
     }
 
     @Override

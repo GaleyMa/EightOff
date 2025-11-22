@@ -12,15 +12,18 @@ public class EightOffJuego {
     private Carta[] celdasLibres;
     private ListaSimple<Carta>[] columnas;
     private ListaSimple<Carta>[] fundaciones;
-    private ListaSimple<Movimiento> historial;
+    private ListaSimple<Movimiento> historialMovimientos;
     private Baraja baraja;
 
     private boolean juegoGanado;
     private boolean juegoTerminado;
     private int numeroMovimientos;
 
+    // NUEVO: Sistema de snapshots para visualización
+    private ListaDobleCircular<SnapshotMovimiento> historialCompletoSnap;
+    private EstadoTablero estadoActual;
+    private boolean enModoVisualizacion = false;
 
-    @SuppressWarnings("unchecked")
     public EightOffJuego() {
         celdasLibres = new Carta[Config.NUM_CELDAS_LIBRES];
 
@@ -34,13 +37,15 @@ public class EightOffJuego {
             fundaciones[i] = new ListaSimple<>();
         }
 
-        historial = new ListaSimple<>();
+        historialMovimientos = new ListaSimple<>();
+
+        this.historialCompletoSnap = new ListaDobleCircular<>();
+        this.estadoActual = new EstadoTablero(this);
 
         juegoGanado = false;
         juegoTerminado = false;
         numeroMovimientos = 0;
     }
-
 
     public void iniciarJuego() {
         limpiarTablero();
@@ -53,11 +58,12 @@ public class EightOffJuego {
         juegoGanado = false;
         juegoTerminado = false;
         numeroMovimientos = 0;
+
+        historialCompletoSnap.limpiar();
+        estadoActual = new EstadoTablero(this);
     }
 
-
     private void limpiarTablero() {
-
         for (int i = 0; i < Config.NUM_CELDAS_LIBRES; i++) {
             celdasLibres[i] = null;
         }
@@ -70,8 +76,7 @@ public class EightOffJuego {
             fundaciones[i].limpiar();
         }
 
-        // Limpiar historial
-        historial.limpiar();
+        historialMovimientos.limpiar();
     }
 
     private void repartirCartas() {
@@ -97,21 +102,6 @@ public class EightOffJuego {
             }
         }
 
-        // Verificar que se repartieron todas las cartas
-        int cartasEnCeldas = 0;
-        for (int i = 0; i < Config.NUM_CELDAS_LIBRES; i++) {
-            if (celdasLibres[i] != null) cartasEnCeldas++;
-        }
-
-        int cartasEnColumnas = 0;
-        for (int i = 0; i < Config.NUM_COLUMNAS; i++) {
-            cartasEnColumnas += columnas[i].getTamaño();
-        }
-
-        System.out.println("Repartición completada:");
-        System.out.println("  Celdas libres: " + cartasEnCeldas + " cartas");
-        System.out.println("  Columnas: " + cartasEnColumnas + " cartas");
-        System.out.println("  Total: " + (cartasEnCeldas + cartasEnColumnas) + "/52 cartas");
     }
 
     /**
@@ -123,12 +113,10 @@ public class EightOffJuego {
             return false;
         }
 
-        // Para Tableau a Tableau
         if (origen == TipoZona.TABLEAU && destino == TipoZona.TABLEAU) {
             return moverSecuenciaTableau(indiceOrigen, indiceDestino);
         }
 
-        // Para movimientos simples (de otros orígenes)
         Carta carta = obtenerCartaDeZona(origen, indiceOrigen);
         if (carta == null) {
             return false;
@@ -138,7 +126,6 @@ public class EightOffJuego {
             return false;
         }
 
-        // Realizar el movimiento simple
         return realizarMovimientoSimple(origen, destino, indiceOrigen, indiceDestino, carta);
     }
 
@@ -153,33 +140,32 @@ public class EightOffJuego {
             return false;
         }
 
-        // Encontrar la secuencia completa que se puede mover
         ListaSimple<Carta> secuencia = obtenerSecuenciaMovible(columnaOrigen);
         if (secuencia.estaVacia()) {
             return false;
         }
 
-        // Validar si la secuencia completa puede moverse al destino
         if (!validarMovimientoSecuenciaTableau(secuencia, indiceDestino)) {
             System.out.println("Movimiento Tableau->Tableau inválido para secuencia");
             return false;
         }
 
-        // Mover toda la secuencia
         moverSecuenciaCompleta(secuencia, columnaOrigen, columnaDestino);
 
-        // Guardar en historial (usamos la primera carta como referencia)
         Carta primeraCarta = secuencia.obtenerPrimero();
         Movimiento movimiento = new Movimiento(primeraCarta, TipoZona.TABLEAU, TipoZona.TABLEAU,
                 indiceOrigen, indiceDestino);
-        movimiento.setSecuenciaMovida(secuencia.getTamaño()); // Guardar cuántas cartas se movieron
-        historial.agregar(movimiento);
+        movimiento.setSecuenciaMovida(secuencia.getTamaño());
+        historialMovimientos.agregar(movimiento);
         numeroMovimientos++;
 
-        // Verificar estado del juego
+        if (!enModoVisualizacion) {
+            String descripcion = "Mover " + secuencia.getTamaño() + " cartas de Col" + (indiceOrigen+1) + " a Col" + (indiceDestino+1);
+            agregarAlHistorial(descripcion, secuencia);
+        }
+
         actualizarEstadoJuego();
 
-        System.out.println("Movimiento Tableau->Tableau exitoso: " + secuencia.getTamaño() + " cartas");
         return true;
     }
 
@@ -221,9 +207,6 @@ public class EightOffJuego {
     /**
      * Valida si una secuencia completa puede moverse a otra columna
      */
-    /**
-     * Valida si una secuencia completa puede moverse a otra columna
-     */
     private boolean validarMovimientoSecuenciaTableau(ListaSimple<Carta> secuencia, int indiceColumna) {
         ListaSimple<Carta> columnaDestino = columnas[indiceColumna];
 
@@ -247,13 +230,6 @@ public class EightOffJuego {
 
         boolean mismoPalo = primeraCartaSecuencia.getPalo() == cartaSuperiorDestino.getPalo();
         boolean consecutivoDescendente = primeraCartaSecuencia.getValor() == cartaSuperiorDestino.getValor() - 1;
-
-        System.out.println("Validando movimiento de secuencia Tableau:");
-        System.out.println("  Primera carta de secuencia: " + primeraCartaSecuencia + " (Valor: " + primeraCartaSecuencia.getValor() + ")");
-        System.out.println("  Carta superior destino: " + cartaSuperiorDestino + " (Valor: " + cartaSuperiorDestino.getValor() + ")");
-        System.out.println("  Mismo palo: " + mismoPalo);
-        System.out.println("  Consecutivo descendente: " + consecutivoDescendente);
-        System.out.println("  Resultado: " + (mismoPalo && consecutivoDescendente));
 
         return mismoPalo && consecutivoDescendente;
     }
@@ -287,14 +263,48 @@ public class EightOffJuego {
 
         // Guardar en historial
         Movimiento movimiento = new Movimiento(carta, origen, destino, indiceOrigen, indiceDestino);
-        historial.agregar(movimiento);
+        historialMovimientos.agregar(movimiento);
         numeroMovimientos++;
+
+        // NUEVO: Guardar snapshot para visualización
+        if (!enModoVisualizacion) {
+            String descripcion = generarDescripcionMovimiento(movimiento);
+            ListaSimple<Carta> cartasInvolucradas = new ListaSimple<>();
+            cartasInvolucradas.agregar(carta);
+            agregarAlHistorial(descripcion, cartasInvolucradas);
+        }
 
         // Verificar estado del juego
         actualizarEstadoJuego();
-
-        System.out.println("Movimiento exitoso: " + carta + " de " + origen + " a " + destino);
         return true;
+    }
+
+    private void agregarAlHistorial(String descripcion, ListaSimple<Carta> cartasInvolucradas) {
+        if (!enModoVisualizacion) {
+            // Ya no necesitamos convertir, pasamos directamente ListaSimple
+            SnapshotMovimiento snapshot = new SnapshotMovimiento(this, descripcion, cartasInvolucradas);
+            historialCompletoSnap.agregar(snapshot);
+            estadoActual = new EstadoTablero(this);
+        }
+    }
+
+    /**
+     * NUEVO: Generar descripción del movimiento
+     */
+    private String generarDescripcionMovimiento(Movimiento movimiento) {
+        String cartaStr = movimiento.getCarta().getRango().getSimbolo() +
+                movimiento.getCarta().getPalo().name().charAt(0);
+
+        switch (movimiento.getDestino()) {
+            case TABLEAU:
+                return "Mover " + cartaStr + " a Columna " + (movimiento.getIndiceDestino() + 1);
+            case FUNDACION:
+                return "Mover " + cartaStr + " a Fundación " + (movimiento.getIndiceDestino() + 1);
+            case CELDA_LIBRE:
+                return "Mover " + cartaStr + " a Celda " + (movimiento.getIndiceDestino() + 1);
+            default:
+                return "Movimiento de " + cartaStr;
+        }
     }
 
     /**
@@ -352,7 +362,7 @@ public class EightOffJuego {
 
         // Si la columna está vacía, cualquier carta puede ir
         if (columnaDestino.estaVacia()) {
-            System.out.println("  Tableau vacío - movimiento permitido");
+            //System.out.println("  Tableau vacío - movimiento permitido");
             return true;
         }
 
@@ -361,13 +371,6 @@ public class EightOffJuego {
 
         boolean mismoPalo = carta.getPalo() == cartaSuperior.getPalo();
         boolean consecutivoDescendente = carta.getValor() == cartaSuperior.getValor() - 1;
-
-        System.out.println("Validando movimiento Tableau:");
-        System.out.println("  Carta a mover: " + carta + " (Valor: " + carta.getValor() + ")");
-        System.out.println("  Carta superior: " + cartaSuperior + " (Valor: " + cartaSuperior.getValor() + ")");
-        System.out.println("  Mismo palo: " + mismoPalo);
-        System.out.println("  Consecutivo descendente: " + consecutivoDescendente);
-        System.out.println("  Resultado: " + (mismoPalo && consecutivoDescendente));
 
         return mismoPalo && consecutivoDescendente;
     }
@@ -396,29 +399,29 @@ public class EightOffJuego {
     private Carta obtenerCartaDeZona(TipoZona zona, int indice) {
         switch (zona) {
             case CELDA_LIBRE:
-                System.out.println("Obteniendo carta de celda libre[" + indice + "]: " + celdasLibres[indice]);
+               // System.out.println("Obteniendo carta de celda libre[" + indice + "]: " + celdasLibres[indice]);
                 return celdasLibres[indice];
 
             case TABLEAU:
                 if (columnas[indice].estaVacia()) {
-                    System.out.println("Tableau[" + indice + "] está vacío");
+                    //System.out.println("Tableau[" + indice + "] está vacío");
                     return null;
                 }
                 Carta cartaTableau = columnas[indice].obtenerUltimo();
-                System.out.println("Obteniendo carta de Tableau[" + indice + "]: " + cartaTableau);
+                //System.out.println("Obteniendo carta de Tableau[" + indice + "]: " + cartaTableau);
                 return cartaTableau;
 
             case FUNDACION:
                 if (fundaciones[indice].estaVacia()) {
-                    System.out.println("Fundación[" + indice + "] está vacía");
+                    //System.out.println("Fundación[" + indice + "] está vacía");
                     return null;
                 }
                 Carta cartaFundacion = fundaciones[indice].obtenerUltimo();
-                System.out.println("Obteniendo carta de Fundación[" + indice + "]: " + cartaFundacion);
+                //System.out.println("Obteniendo carta de Fundación[" + indice + "]: " + cartaFundacion);
                 return cartaFundacion;
 
             default:
-                System.out.println("Zona desconocida: " + zona);
+                //System.out.println("Zona desconocida: " + zona);
                 return null;
         }
     }
@@ -469,11 +472,11 @@ public class EightOffJuego {
      * Deshace el último movimiento realizado
      */
     public boolean deshacerMovimiento() {
-        if (historial.estaVacia()) {
+        if (historialMovimientos.estaVacia()) {
             return false;
         }
 
-        Movimiento movimiento = historial.eliminarUltimo();
+        Movimiento movimiento = historialMovimientos.eliminarUltimo();
 
         // Si fue un movimiento de secuencia, deshacer múltiples cartas
         if (movimiento.getSecuenciaMovida() > 1 &&
@@ -594,7 +597,6 @@ public class EightOffJuego {
         return movimientos;
     }
 
-
     public boolean verificarVictoria() {
         int cartasEnFundaciones = 0;
         for (int i = 0; i < Config.NUM_FUNDACIONES; i++) {
@@ -602,7 +604,6 @@ public class EightOffJuego {
         }
         return cartasEnFundaciones == Config.TOTAL_CARTAS;
     }
-
 
     public boolean verificarJuegoTerminado() {
         if (verificarVictoria()) {
@@ -622,34 +623,190 @@ public class EightOffJuego {
             juegoTerminado = verificarJuegoTerminado();
         }
     }
+
+    // ========== NUEVOS MÉTODOS PARA CONTROL DE HISTORIAL VISUAL ==========
+
+    /**
+     * NUEVO: Aplicar un snapshot al juego actual
+     */
+    public void aplicarSnapshot(EstadoTablero snapshot) {
+        if (snapshot == null) return;
+
+        // Limpiar tablero actual
+        limpiarTablero();
+
+        // Reconstruir celdas libres desde snapshot
+        String[] celdasSnapshot = snapshot.getCeldasLibres();
+        for (int i = 0; i < celdasSnapshot.length; i++) {
+            if (celdasSnapshot[i] != null) {
+                Carta carta = deserializarCarta(celdasSnapshot[i]);
+                if (carta != null) {
+                    carta.ponerBocaArriba();
+                    celdasLibres[i] = carta;
+                }
+            }
+        }
+
+        // Reconstruir columnas desde snapshot
+        String[][] columnasSnapshot = snapshot.getColumnas();
+        for (int i = 0; i < columnasSnapshot.length; i++) {
+            for (String cartaStr : columnasSnapshot[i]) {
+                Carta carta = deserializarCarta(cartaStr);
+                if (carta != null) {
+                    carta.ponerBocaArriba();
+                    columnas[i].agregar(carta);
+                }
+            }
+        }
+
+        // Reconstruir fundaciones desde snapshot
+        String[][] fundacionesSnapshot = snapshot.getFundaciones();
+        for (int i = 0; i < fundacionesSnapshot.length; i++) {
+            for (String cartaStr : fundacionesSnapshot[i]) {
+                Carta carta = deserializarCarta(cartaStr);
+                if (carta != null) {
+                    carta.ponerBocaArriba();
+                    fundaciones[i].agregar(carta);
+                }
+            }
+        }
+
+        // Actualizar contador de movimientos
+        this.numeroMovimientos = snapshot.getNumeroMovimientos();
+
+        // Actualizar estado del juego
+        actualizarEstadoJuego();
+    }
+
+    /**
+     * NUEVO: Convertir string serializado a objeto Carta
+     */
+    private Carta deserializarCarta(String cartaStr) {
+        if (cartaStr == null || cartaStr.length() < 2) return null;
+
+        try {
+            String simbolo = cartaStr.substring(0, cartaStr.length() - 1);
+            char paloChar = cartaStr.charAt(cartaStr.length() - 1);
+
+            Rango rango = Rango.fromSimbolo(simbolo);
+            Palo palo = Palo.fromChar(paloChar);
+
+            if (rango != null && palo != null) {
+                return new Carta(palo, rango);
+            }
+        } catch (Exception e) {
+            System.err.println("Error deserializando carta: " + cartaStr);
+        }
+        return null;
+    }
+
+    public void entrarModoVisualizacion() {
+        this.enModoVisualizacion = true;
+        // Guardar el estado actual antes de empezar a navegar
+        estadoActual = new EstadoTablero(this);
+    }
+
+    public void salirModoVisualizacion(boolean aplicarCambios) {
+        this.enModoVisualizacion = false;
+        if (!aplicarCambios) {
+            // Restaurar al estado actual del juego real (antes de entrar al modo visualización)
+            aplicarSnapshot(estadoActual);
+        } else {
+            // Actualizar el estado actual al visualizado
+            estadoActual = new EstadoTablero(this);
+            // Truncar historial desde la posición actual
+            historialCompletoSnap.truncarDesdeActual();
+        }
+    }
+
+    // Métodos de navegación del historial visual
+    public SnapshotMovimiento deshacerVisual() {
+        if (!historialCompletoSnap.puedeDeshacer()) return null;
+        return historialCompletoSnap.deshacer();
+    }
+
+    public SnapshotMovimiento rehacerVisual() {
+        if (!historialCompletoSnap.puedeRehacer()) return null;
+        return historialCompletoSnap.rehacer();
+    }
+
+    public SnapshotMovimiento irPrimeroHistorial() {
+        return historialCompletoSnap.irPrimero();
+    }
+
+    public SnapshotMovimiento irUltimoHistorial() {
+        return historialCompletoSnap.irUltimo();
+    }
+
+    public void truncarHistorialVisualDesdeActual() {
+        historialCompletoSnap.truncarDesdeActual();
+        estadoActual = new EstadoTablero(this);
+    }
+
+    // Getters para la UI
+    public boolean puedeDeshacerVisual() {
+        return historialCompletoSnap.puedeDeshacer();
+    }
+
+    public boolean puedeRehacerVisual() {
+        return historialCompletoSnap.puedeRehacer();
+    }
+
+    public int getPosicionHistorialVisual() {
+        return historialCompletoSnap.getPosicionActual();
+    }
+
+    public int getTamañoHistorialVisual() {
+        return historialCompletoSnap.getTamaño();
+    }
+
+    public boolean isEnModoVisualizacion() {
+        return enModoVisualizacion;
+    }
+
+    public EstadoTablero getEstadoActual() {
+        return estadoActual;
+    }
+    public ListaDobleCircular<SnapshotMovimiento> getHistorialCompletoSnap() {
+        return historialCompletoSnap;
+    }
+    // ========== GETTERS PÚBLICOS EXISTENTES ==========
+
     public Carta[] getCeldasLibres() {
         return celdasLibres;
     }
+
     public ListaSimple<Carta> getColumna(int indice) {
         if (indice < 0 || indice >= Config.NUM_COLUMNAS) {
             throw new IndexOutOfBoundsException("Índice de columna inválido: " + indice);
         }
         return columnas[indice];
     }
+
     public ListaSimple<Carta> getFundacion(int indice) {
         if (indice < 0 || indice >= Config.NUM_FUNDACIONES) {
             throw new IndexOutOfBoundsException("Índice de fundación inválido: " + indice);
         }
         return fundaciones[indice];
     }
+
     public boolean isJuegoGanado() {
         return juegoGanado;
     }
+
     public boolean isJuegoTerminado() {
         return juegoTerminado;
     }
+
     public int getNumeroMovimientos() {
         return numeroMovimientos;
     }
+
     public boolean puedeDeshacer() {
-        return !historial.estaVacia();
+        return !historialMovimientos.estaVacia();
     }
+
     public int getTamañoHistorial() {
-        return historial.getTamaño();
+        return historialMovimientos.getTamaño();
     }
 }

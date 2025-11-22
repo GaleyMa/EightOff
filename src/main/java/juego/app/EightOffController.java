@@ -1,12 +1,17 @@
 package juego.app;
 
 import javafx.animation.*;
+import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.util.Duration;
-
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import juego.logica.*;
 import juego.grafica.*;
 
@@ -22,6 +27,12 @@ public class EightOffController {
     @FXML private Button btnDeshacer;
     @FXML private Button btnPista;
     @FXML private Label labelMovimientos;
+    @FXML private VBox panelHistorial;
+    @FXML private Button btnVerHistorial, btnPrimero, btnAnterior, btnSiguiente, btnUltimo;
+    @FXML private Button btnAplicarEstado, btnCancelarVisualizacion;
+    @FXML private Label labelInfoHistorial;
+    @FXML private StackPane overlayPanel;
+
     private EightOffJuego juego;
     private CeldaLibreView[] celdasLibresViews;
     private ColumnaView[] columnasViews;
@@ -29,13 +40,16 @@ public class EightOffController {
     private CartaView cartaSeleccionada;
     private TipoZona origenSeleccionado;
     private int indiceOrigen;
+    private boolean enModoVisualizacion = false;
 
     @FXML
     public void initialize() {
         inicializarJuego();
         inicializarComponentesGraficos();
+        //inicializarPanelHistorial();
         configurarEventHandlers();
         actualizarTableroCompleto();
+        btnVerHistorial.setDisable(juego.getTamañoHistorialVisual() == 1);
     }
 
     private void inicializarJuego() {
@@ -502,4 +516,265 @@ public class EightOffController {
         alert.setContentText(contenido);
         alert.showAndWait();
     }
+
+    // En EightOffController.java - agregar estos métodos:
+
+    // ========== MÉTODOS PARA EL HISTORIAL ==========
+    @FXML
+    private void onVerHistorial() {
+        if (juego.getTamañoHistorialVisual() == 0) {
+            mostrarMensaje("Historial Vacío", "No hay movimientos en el historial.");
+            return;
+        }
+
+        enModoVisualizacion = true;
+        juego.entrarModoVisualizacion();
+        overlayPanel.setVisible(true);
+        actualizarControlesHistorial();
+        deshabilitarInteraccionNormal();
+        onUltimoHistorial(); // Ir al último movimiento
+        actualizarControlesHistorial();
+    }
+
+    @FXML
+    private void onPrimeroHistorial() {
+        SnapshotMovimiento snapshot = juego.irPrimeroHistorial();
+        if (snapshot != null) {
+            aplicarSnapshotYResaltar(snapshot);
+        }
+        actualizarControlesHistorial();
+    }
+
+    @FXML
+    private void onAnteriorHistorial() {
+        SnapshotMovimiento snapshot = juego.deshacerVisual();
+        if (snapshot != null) {
+            aplicarSnapshotYResaltar(snapshot);
+        }
+    }
+
+    @FXML
+    private void onSiguienteHistorial() {
+        SnapshotMovimiento snapshot = juego.rehacerVisual();
+        if (snapshot != null) {
+            aplicarSnapshotYResaltar(snapshot);
+        }
+        actualizarControlesHistorial();
+    }
+
+    @FXML
+    private void onUltimoHistorial() {
+        SnapshotMovimiento snapshot = juego.irUltimoHistorial();
+        if (snapshot != null) {
+            aplicarSnapshotYResaltar(snapshot);
+        }
+        actualizarControlesHistorial();
+    }
+
+    @FXML
+    private void onAplicarEstadoHistorial() {
+        salirModoVisualizacion(true);
+        mostrarMensaje("Historial Aplicado", "El juego continúa desde el estado seleccionado.");
+        actualizarControlesHistorial();
+    }
+
+    @FXML
+    private void onCancelarVisualizacion() {
+        salirModoVisualizacion(false);
+        mostrarMensaje("Visualización Cancelada", "Se restauró el estado original del juego.");
+        actualizarControlesHistorial();
+    }
+    // ========== MÉTODOS PRIVADOS AUXILIARES ==========
+
+
+    private void aplicarSnapshotYResaltar(SnapshotMovimiento snapshot) {
+        juego.aplicarSnapshot(snapshot.getEstadoTablero());
+        actualizarTableroCompleto();
+        resaltarCartasInvolucradas(snapshot.getCartasInvolucradas());
+        actualizarControlesHistorial();
+    }
+
+
+    private void salirModoVisualizacion(boolean aplicarCambios) {
+        enModoVisualizacion = false;
+        juego.salirModoVisualizacion(aplicarCambios);
+        overlayPanel.setVisible(false);
+        habilitarInteraccionNormal();
+        actualizarTableroCompleto();
+        limpiarResaltados();
+    }
+    private void actualizarControlesHistorial() {
+        btnAnterior.setDisable(!juego.puedeDeshacerVisual());
+        btnSiguiente.setDisable(!juego.puedeRehacerVisual());
+
+        int posicion = juego.getPosicionHistorialVisual();
+        int total = juego.getTamañoHistorialVisual();
+        labelInfoHistorial.setText("Movimiento " + posicion + "/" + total);
+    }
+
+    private void deshabilitarInteraccionNormal() {
+        btnDeshacer.setDisable(true);
+        btnPista.setDisable(true);
+        btnVerHistorial.setDisable(true);
+        setInteractividadCartas(false);
+    }
+
+    private void habilitarInteraccionNormal() {
+        btnDeshacer.setDisable(!juego.puedeDeshacer());
+        btnPista.setDisable(false);
+        btnVerHistorial.setDisable(juego.getTamañoHistorialVisual() == 0);
+        setInteractividadCartas(true);
+    }
+    private void setInteractividadCartas(boolean habilitado) {
+        for (CeldaLibreView celda : celdasLibresViews) {
+            celda.setDisable(!habilitado);
+        }
+        for (ColumnaView columna : columnasViews) {
+            columna.setDisable(!habilitado);
+        }
+        for (FundacionView fundacion : fundacionesViews) {
+            fundacion.setDisable(!habilitado);
+        }
+    }
+    // ========== MÉTODOS DE RESALTADO ==========
+
+    private void resaltarCartasInvolucradas(ListaSimple<String> idsCartas) {
+        // Limpiar resaltados anteriores
+        limpiarResaltados();
+
+        // Resaltar cartas involucradas en el movimiento actual
+        for (int i = 0; i < idsCartas.getTamaño(); i++) {
+            String idCarta = idsCartas.obtener(i);
+            CartaView cartaView = encontrarCartaPorId(idCarta);
+            if (cartaView != null) {
+                cartaView.aplicarResaltadoHistorial();
+            }
+        }
+    }
+
+    private void limpiarResaltados() {
+        // Limpiar resaltados de todas las celdas libres
+        for (CeldaLibreView celda : celdasLibresViews) {
+            if (!celda.estaVacia()) {
+                celda.getCartaView().quitarResaltadoHistorial();
+            }
+        }
+
+        // Limpiar resaltados de todas las columnas - USANDO ObservableList
+        for (ColumnaView columna : columnasViews) {
+            ObservableList<CartaView> cartasColumna = columna.getCartas();
+            for (CartaView cartaView : cartasColumna) {
+                cartaView.quitarResaltadoHistorial();
+            }
+        }
+
+        // Limpiar resaltados de todas las fundaciones
+        for (FundacionView fundacion : fundacionesViews) {
+            if (!fundacion.estaVacia()) {
+                fundacion.getCartaView().quitarResaltadoHistorial();
+            }
+        }
+    }
+
+    private CartaView encontrarCartaPorId(String idCarta) {
+        // Buscar en celdas libres
+        for (CeldaLibreView celda : celdasLibresViews) {
+            if (!celda.estaVacia()) {
+                CartaView cartaView = celda.getCartaView();
+                if (cartaView != null) {
+                    Carta carta = cartaView.getCarta();
+                    String cartaId = carta.getRango().getSimbolo() + carta.getPalo().name().charAt(0);
+                    if (cartaId.equals(idCarta)) {
+                        return cartaView;
+                    }
+                }
+            }
+        }
+
+        // Buscar en columnas - USANDO ObservableList directamente
+        for (ColumnaView columna : columnasViews) {
+            ObservableList<CartaView> cartasColumna = columna.getCartas(); // Tu método existente
+            for (CartaView cartaView : cartasColumna) { // Iterar directamente sobre ObservableList
+                Carta carta = cartaView.getCarta();
+                String cartaId = carta.getRango().getSimbolo() + carta.getPalo().name().charAt(0);
+                if (cartaId.equals(idCarta)) {
+                    return cartaView;
+                }
+            }
+        }
+
+        // Buscar en fundaciones
+        for (FundacionView fundacion : fundacionesViews) {
+            if (!fundacion.estaVacia()) {
+                CartaView cartaView = fundacion.getCartaView();
+                if (cartaView != null) {
+                    Carta carta = cartaView.getCarta();
+                    String cartaId = carta.getRango().getSimbolo() + carta.getPalo().name().charAt(0);
+                    if (cartaId.equals(idCarta)) {
+                        return cartaView;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private boolean coincideCarta(Carta carta, String idCarta) {
+        if (carta == null || idCarta == null) return false;
+
+        String cartaId = carta.getRango().getSimbolo() + carta.getPalo().name().charAt(0);
+        return cartaId.equals(idCarta);
+    }
+
+    private void aplicarEstadoHistorial() {
+        salirModoVisualizacion(true);
+    }
+
+    private void cancelarVisualizacion() {
+        salirModoVisualizacion(false);
+    }
+
+
+
+    private void navegarPrimeroHistorial() {
+        SnapshotMovimiento snapshot = juego.irPrimeroHistorial();
+        if (snapshot != null) {
+            juego.aplicarSnapshot(snapshot.getEstadoTablero());
+            actualizarTableroCompleto();
+            resaltarCartasInvolucradas(snapshot.getCartasInvolucradas()); // Ahora usa ListaSimple
+            actualizarControlesHistorial();
+        }
+    }
+
+    private void navegarAnteriorHistorial() {
+        SnapshotMovimiento snapshot = juego.deshacerVisual();
+        if (snapshot != null) {
+            juego.aplicarSnapshot(snapshot.getEstadoTablero());
+            actualizarTableroCompleto();
+            resaltarCartasInvolucradas(snapshot.getCartasInvolucradas()); // Ahora usa ListaSimple
+            actualizarControlesHistorial();
+        }
+    }
+
+    private void navegarSiguienteHistorial() {
+        SnapshotMovimiento snapshot = juego.rehacerVisual();
+        if (snapshot != null) {
+            juego.aplicarSnapshot(snapshot.getEstadoTablero());
+            actualizarTableroCompleto();
+            resaltarCartasInvolucradas(snapshot.getCartasInvolucradas()); // Ahora usa ListaSimple
+            actualizarControlesHistorial();
+        }
+    }
+
+    private void navegarUltimoHistorial() {
+        SnapshotMovimiento snapshot = juego.irUltimoHistorial();
+        if (snapshot != null) {
+            juego.aplicarSnapshot(snapshot.getEstadoTablero());
+            actualizarTableroCompleto();
+            resaltarCartasInvolucradas(snapshot.getCartasInvolucradas()); // Ahora usa ListaSimple
+            actualizarControlesHistorial();
+        }
+    }
+
 }

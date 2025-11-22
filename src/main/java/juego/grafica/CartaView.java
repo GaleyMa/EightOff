@@ -1,5 +1,6 @@
 package juego.grafica;
 
+import javafx.collections.ObservableList;
 import javafx.scene.layout.StackPane;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -48,6 +49,18 @@ public class CartaView extends StackPane {
         } else {
             cargarImagenReverso();
         }
+    }
+    public void aplicarResaltadoHistorial() {
+        // Efecto visual para resaltar cartas en modo historial
+        setEffect(new DropShadow(15, Color.YELLOW));
+        setScaleX(1.05);
+        setScaleY(1.05);
+    }
+
+    public void quitarResaltadoHistorial() {
+        setEffect(null);
+        setScaleX(1.0);
+        setScaleY(1.0);
     }
 
     private void cargarImagenFrente() {
@@ -121,4 +134,5 @@ public class CartaView extends StackPane {
     public Carta getCarta() { return carta; }
     public boolean isSeleccionada() { return seleccionada.get(); }
     public BooleanProperty seleccionadaProperty() { return seleccionada; }
+
 }

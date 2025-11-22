@@ -22,7 +22,14 @@ public enum Rango {
         this.simbolo = simbolo;
         this.valor = valor;
     }
-
+    public static Rango fromSimbolo(String simbolo) {
+        for (Rango rango : values()) {
+            if (rango.getSimbolo().equals(simbolo)) {
+                return rango;
+            }
+        }
+        return null;
+    }
     public String getSimbolo() {
         return simbolo;
     }

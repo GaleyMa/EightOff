@@ -91,7 +91,13 @@ public class CeldaLibreView extends StackPane {
     }
 
     public CartaView getCartaView() {
-        return cartaView;
+        // Retorna la carta actual o null si está vacía
+        for (javafx.scene.Node node : getChildren()) {
+            if (node instanceof CartaView) {
+                return (CartaView) node;
+            }
+        }
+        return null;
     }
 
 

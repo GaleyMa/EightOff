@@ -1,5 +1,6 @@
+
 package juego.logica;
-import java.util.Random;
+
 
 public class ListaDobleCircular<T> {
 
@@ -16,10 +17,12 @@ public class ListaDobleCircular<T> {
     }
 
     private NodoDoble cabeza;
+    private NodoDoble cursor;
     private int tamaño;
 
     public ListaDobleCircular() {
         this.cabeza = null;
+        this.cursor = null;
         this.tamaño = 0;
     }
 
@@ -30,6 +33,7 @@ public class ListaDobleCircular<T> {
             cabeza = nuevoNodo;
             nuevoNodo.siguiente = nuevoNodo;
             nuevoNodo.anterior = nuevoNodo;
+            cursor = nuevoNodo;
         } else {
             NodoDoble ultimo = cabeza.anterior;
 
@@ -37,13 +41,94 @@ public class ListaDobleCircular<T> {
             nuevoNodo.anterior = ultimo;
             nuevoNodo.siguiente = cabeza;
             cabeza.anterior = nuevoNodo;
+
+            cursor = nuevoNodo;
         }
         tamaño++;
     }
 
+    // MÉTODOS DE NAVEGACIÓN DEL HISTORIAL CORREGIDOS:
+
+    public boolean puedeDeshacer() {
+        // Puede deshacer si hay un elemento anterior al cursor
+        return cursor != null && cursor.anterior != cursor;
+    }
+
+    public boolean puedeRehacer() {
+        // Puede rehacer si hay un elemento siguiente al cursor (hacia adelante en el tiempo)
+        return cursor != null && cursor.siguiente != cursor;
+    }
+
+    public T deshacer() {
+        if (!puedeDeshacer()) return null;
+        // Moverse al estado anterior
+        cursor = cursor.anterior;
+        return cursor.dato;
+    }
+
+    public T rehacer() {
+        if (!puedeRehacer()) return null;
+        // Moverse al estado siguiente
+        cursor = cursor.siguiente;
+        return cursor.dato;
+    }
+
+    public T irPrimero() {
+        if (cabeza == null) return null;
+        // Ir al primer elemento (más antiguo)
+        cursor = cabeza;
+        return cursor.dato;
+    }
+
+    public T irUltimo() {
+        if (cabeza == null) return null;
+        // Ir al último elemento (más reciente)
+        cursor = cabeza.anterior;
+        return cursor.dato;
+    }
+
+    public int getPosicionActual() {
+        if (cursor == null) return 0;
+
+        // Contar desde el inicio hasta el cursor
+        int posicion = 1;
+        NodoDoble actual = cabeza;
+
+        while (actual != cursor) {
+            posicion++;
+            actual = actual.siguiente;
+            // Protección contra ciclos infinitos
+            if (posicion > tamaño) {
+                break;
+            }
+        }
+
+        return posicion;
+    }
+
+    public int getTamaño() {
+        return tamaño;
+    }
+
+    public void truncarDesdeActual() {
+        if (cursor == null) return;
+
+        cabeza = cursor;
+        cabeza.anterior = cursor;
+        cabeza.siguiente = cursor;
+
+        tamaño = 1;
+        NodoDoble actual = cabeza.siguiente;
+        while (actual != cabeza && tamaño < 100) {
+            tamaño++;
+            actual = actual.siguiente;
+        }
+    }
+
+
     public void agregarAlInicio(T elemento) {
         agregar(elemento);
-        cabeza = cabeza.anterior; // Mover la cabeza al nuevo nodo
+        cabeza = cabeza.anterior;
     }
 
     public boolean eliminar(T elemento) {
@@ -63,7 +148,6 @@ public class ListaDobleCircular<T> {
         return false;
     }
 
-
     public T eliminarEnIndice(int indice) {
         if (indice < 0 || indice >= tamaño) {
             throw new IndexOutOfBoundsException("Índice fuera de rango: " + indice);
@@ -77,15 +161,17 @@ public class ListaDobleCircular<T> {
 
     private void eliminarNodo(NodoDoble nodo) {
         if (tamaño == 1) {
-            // Único nodo en la lista
             cabeza = null;
+            cursor = null;
         } else {
             nodo.anterior.siguiente = nodo.siguiente;
             nodo.siguiente.anterior = nodo.anterior;
 
-            // Si eliminamos la cabeza, mover la cabeza al siguiente
             if (nodo == cabeza) {
                 cabeza = nodo.siguiente;
+            }
+            if (nodo == cursor) {
+                cursor = nodo.anterior;
             }
         }
         tamaño--;
@@ -120,117 +206,19 @@ public class ListaDobleCircular<T> {
                 actual = actual.anterior;
             }
         }
-
         return actual;
     }
-
 
     public boolean estaVacia() {
         return tamaño == 0;
     }
 
-
-    public int getTamaño() {
-        return tamaño;
-    }
-
     public void limpiar() {
         cabeza = null;
+        cursor = null;
         tamaño = 0;
     }
 
-    public void barajar() {
-        if (tamaño <= 1) {
-            return;
-        }
-
-        Random random = new Random();
-
-        // Convertir temporalmente a array para facilitar el barajado
-        @SuppressWarnings("unchecked")
-        T[] elementos = (T[]) new Object[tamaño];
-
-        NodoDoble actual = cabeza;
-        for (int i = 0; i < tamaño; i++) {
-            elementos[i] = actual.dato;
-            actual = actual.siguiente;
-        }
-
-        // Algoritmo Fisher-Yates
-        for (int i = tamaño - 1; i > 0; i--) {
-            int j = random.nextInt(i + 1);
-            // Intercambiar elementos[i] con elementos[j]
-            T temp = elementos[i];
-            elementos[i] = elementos[j];
-            elementos[j] = temp;
-        }
-
-        // Reconstruir la lista circular con el orden barajado
-        actual = cabeza;
-        for (int i = 0; i < tamaño; i++) {
-            actual.dato = elementos[i];
-            actual = actual.siguiente;
-        }
-    }
-
-
-    public void barajar(long seed) {
-        if (tamaño <= 1) {
-            return;
-        }
-
-        Random random = new Random(seed);
-
-        @SuppressWarnings("unchecked")
-        T[] elementos = (T[]) new Object[tamaño];
-
-        NodoDoble actual = cabeza;
-        for (int i = 0; i < tamaño; i++) {
-            elementos[i] = actual.dato;
-            actual = actual.siguiente;
-        }
-
-        for (int i = tamaño - 1; i > 0; i--) {
-            int j = random.nextInt(i + 1);
-            T temp = elementos[i];
-            elementos[i] = elementos[j];
-            elementos[j] = temp;
-        }
-
-        actual = cabeza;
-        for (int i = 0; i < tamaño; i++) {
-            actual.dato = elementos[i];
-            actual = actual.siguiente;
-        }
-    }
-
-
-    public void rotarAdelante() {
-        if (cabeza != null) {
-            cabeza = cabeza.siguiente;
-        }
-    }
-
-
-    public void rotarAtras() {
-        if (cabeza != null) {
-            cabeza = cabeza.anterior;
-        }
-    }
-
-    public T[] toArray() {
-        if (estaVacia()) {
-            return (T[]) new Object[0];
-        }
-
-        T[] array = (T[]) new Object[tamaño];
-        NodoDoble actual = cabeza;
-        for (int i = 0; i < tamaño; i++) {
-            array[i] = actual.dato;
-            actual = actual.siguiente;
-        }
-        return array;
-    }
 
     @Override
     public String toString() {
@@ -241,7 +229,11 @@ public class ListaDobleCircular<T> {
         StringBuilder sb = new StringBuilder("[");
         NodoDoble actual = cabeza;
         for (int i = 0; i < tamaño; i++) {
-            sb.append(actual.dato);
+            if (actual == cursor) {
+                sb.append("[").append(actual.dato).append("]");
+            } else {
+                sb.append(actual.dato);
+            }
             if (i < tamaño - 1) {
                 sb.append(", ");
             }

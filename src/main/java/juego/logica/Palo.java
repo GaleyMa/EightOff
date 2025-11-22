@@ -15,6 +15,15 @@ public enum Palo {
         this.color = color;
         this.simbolo = simbolo;
     }
+    public static Palo fromChar(char c) {
+        switch (c) {
+            case 'C': return CORAZONES;
+            case 'D': return DIAMANTES;
+            case 'T': return TREBOLES;
+            case 'P': return PICAS;
+            default: return null;
+        }
+    }
 
     public String getColor() {
         return color;
