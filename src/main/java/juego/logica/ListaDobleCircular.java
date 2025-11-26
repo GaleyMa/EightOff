@@ -47,28 +47,26 @@ public class ListaDobleCircular<T> {
         tamaño++;
     }
 
-    // MÉTODOS DE NAVEGACIÓN DEL HISTORIAL CORREGIDOS:
 
     public boolean puedeDeshacer() {
-        // Puede deshacer si hay un elemento anterior al cursor
+
         return cursor != null && cursor.anterior != cursor;
     }
 
     public boolean puedeRehacer() {
-        // Puede rehacer si hay un elemento siguiente al cursor (hacia adelante en el tiempo)
         return cursor != null && cursor.siguiente != cursor;
     }
 
     public T deshacer() {
         if (!puedeDeshacer()) return null;
-        // Moverse al estado anterior
+
         cursor = cursor.anterior;
         return cursor.dato;
     }
 
     public T rehacer() {
         if (!puedeRehacer()) return null;
-        // Moverse al estado siguiente
+
         cursor = cursor.siguiente;
         return cursor.dato;
     }
